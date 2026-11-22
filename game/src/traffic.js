@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { TRAFFIC, CAR } from './config.js';
 import { ArcadeCar, makeCarMesh } from './car.js';
+import { resolveCircleVsBuildings } from './city.js';
 import { mulberry32, range, pick } from './random.js';
 
 /** A traffic car that loops a rectangle of four road lines. */
@@ -58,14 +59,21 @@ export class Pedestrian {
     const dz = this.target.z - this.pos.z;
     const dist = Math.hypot(dx, dz);
     if (dist < 1.5) {
-      const p = city.roadPoint();
-      this.target = { x: p.x + range(Math.random, -4, 4), z: p.z + range(Math.random, -4, 4) };
+      // Next target: another sidewalk point, so pedestrians live on the
+      // sidewalks and only cross roads on the way there.
+      this.target = city.sidewalkPoint();
       return;
     }
     const nx = dx / dist;
     const nz = dz / dist;
-    this.pos.x += nx * TRAFFIC.pedSpeed * dt;
-    this.pos.z += nz * TRAFFIC.pedSpeed * dt;
+    const fixed = resolveCircleVsBuildings(
+      this.pos.x + nx * TRAFFIC.pedSpeed * dt,
+      this.pos.z + nz * TRAFFIC.pedSpeed * dt,
+      0.4,
+      colliders,
+    );
+    this.pos.x = fixed.x;
+    this.pos.z = fixed.z;
     this.phase += dt * 6;
     this.mesh.position.set(this.pos.x, 0, this.pos.z);
     this.mesh.rotation.y = Math.atan2(nx, nz);

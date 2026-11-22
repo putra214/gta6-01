@@ -203,6 +203,17 @@ export function buildCity(scene, seed) {
       const along = range(rng, -half + 8, half - 8);
       return rng() < 0.5 ? { x: line, z: along } : { x: along, z: line };
     },
+    /** A random point on a block's sidewalk, clear of the road. */
+    sidewalkPoint() {
+      const bx = Math.floor(rng() * CITY.blocks);
+      const bz = Math.floor(rng() * CITY.blocks);
+      const blockX = -half + CITY.roadWidth + bx * CITY.pitch;
+      const blockZ = -half + CITY.roadWidth + bz * CITY.pitch;
+      return {
+        x: blockX + range(rng, 3, CITY.blockSize - 3),
+        z: blockZ + range(rng, 3, CITY.blockSize - 3),
+      };
+    },
     /** The centre of a road line, used for traffic waypoints. */
     roadLineAt(index) {
       return roadLines[index % roadLines.length];
