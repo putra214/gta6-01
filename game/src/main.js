@@ -103,6 +103,7 @@ const world = {
   pickedUp: false,
   delivered: false,
   atHideout: false,
+  tookSedan: false, // the black sedan was stolen (job 3's car)
   pedCooldown: 0,
   time: 0,
 };
@@ -120,6 +121,7 @@ function resetWorld() {
   world.pickedUp = false;
   world.delivered = false;
   world.atHideout = false;
+  world.tookSedan = false;
   missions.index = 0;
   for (const m of missions.list) m.done = false;
   police.clear();
@@ -164,6 +166,7 @@ function stealCar(car) {
   world.driving = true;
   world.car = car;
   world.stolen = true;
+  if (car === blackSedan) world.tookSedan = true;
   world.wanted = Math.max(world.wanted, 1);
   police.raise(1, walker.pos, city.colliders);
   audio.blip();

@@ -37,12 +37,16 @@ export function createMissions(city) {
     {
       id: 'getaway',
       title: 'JOB 3 — THE GETAWAY',
-      text: 'Take the black sedan and reach the hideout with the cops on your tail.',
+      text: 'Take the black sedan and reach the hideout.',
       marker: hideout,
       reward: MISSIONS.rewards[2],
       done: false,
       check(world) {
-        return world.atHideout && world.wanted > 0;
+        // Reach the hideout in the black sedan. (The wanted level is NOT
+        // part of the check: a fast driver outruns the cops before the
+        // hideout, and the job must still complete — otherwise the game
+        // soft-locks with 0 stars and no way to finish.)
+        return world.atHideout && world.tookSedan;
       },
     },
   ];
