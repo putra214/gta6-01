@@ -29,10 +29,13 @@ export const CAR = {
 
 export const WANTED = {
   maxStars: 5,
-  heatDecaySeconds: 7, // seconds out of police sight before heat falls
+  escapeDistance: 150, // m — stay farther than this from every cop to escape
+  escapeSeconds: 15, // seconds beyond escapeDistance before the heat dies
   policeSight: 45, // m — closer than this, the police see you
-  policeSpeed: 13, // m/s — well below the player's top speed; the police cut
-  // corners across blocks, so a bigger gap is needed for a clean getaway
+  policeSpeed: 11, // m/s — well below the player's top speed; the police cut
+  // corners across blocks, so a bigger gap is needed for a clean getaway.
+  // Lowered from 13 after the 150 m / 15 s escape rule proved unreachable:
+  // at 13 the player gains at most ~9 m/s on a straight, under 150 m.
   bustSeconds: 2, // seconds a cop must touch a slow player to bust them
 };
 

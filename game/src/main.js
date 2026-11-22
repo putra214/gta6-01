@@ -37,6 +37,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.35;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(COLORS.fog, 80, 300); // thicker haze for depth
@@ -143,6 +144,7 @@ const world = {
 };
 
 function resetWorld() {
+  pressedE = false; // a key pressed before the reset must not fire after it
   walker.pos.x = 0;
   walker.pos.z = -72;
   walker.heading = 0;
@@ -297,6 +299,10 @@ function completeMissionIfReady() {
     world.delivered = false;
     world.atHideout = false;
     updateMissionText();
+    // Job 1 done: the fixer confirms the payout on the phone. Shown AFTER
+    // updateMissionText, so the new job's briefing does not overwrite it in
+    // the same frame — the player actually reads the completion message.
+    if (mission.id === 'steal') hud.showDialog('MIRA', 'JOB 1 COMPLETE — $400 banked.');
   }
 }
 
@@ -390,10 +396,14 @@ function stageShot(name) {
   // frame: a cop behind the player would sit behind the chase camera and
   // never be seen, and an oncoming cop closes too fast to frame reliably.
   // (The dispatch panel still reports the real distance.)
-  police.car.pos.x = 26;
-  police.car.pos.z = 50;
-  police.car.heading = 0;
-  police.car.speed = 20;
+  police.cars[0].pos.x = 26;
+  police.cars[0].pos.z = 50;
+  police.cars[0].heading = 0;
+  police.cars[0].speed = 20;
+  police.cars[1].pos.x = 26;
+  police.cars[1].pos.z = 95;
+  police.cars[1].heading = 0;
+  police.cars[1].speed = 20;
   stageCrowd(26, 0, 7);
   // Cars ahead on the same road and one crossing the junction ahead, so
   // the street reads as traffic instead of an empty runway. They are
@@ -433,7 +443,9 @@ function placeTraffic(i, x, z, heading) {
 // ---------------------------------------------------------------------------
 let pressedE = false;
 window.addEventListener('keydown', (event) => {
-  if (event.code === 'KeyE') pressedE = true;
+  // E only counts while playing: an E pressed on the pause screen must not
+  // fire on resume (it used to exit the car the moment play continued).
+  if (event.code === 'KeyE' && world.state === 'play') pressedE = true;
   if (event.code === 'KeyM') {
     const muted = audio.toggleMute();
     hud.setPrompt(muted ? 'Sound muted (M to unmute)' : '');
@@ -444,6 +456,13 @@ window.addEventListener('keydown', (event) => {
   }
   if (event.code === 'KeyP' && (world.state === 'play' || world.state === 'pause')) {
     world.state = world.state === 'play' ? 'pause' : 'play';
+    if (world.state === 'pause') {
+      // A key pressed while paused must not fire on resume, and the
+      // engine/siren must not keep sounding over the pause screen.
+      pressedE = false;
+      audio.setEngine(0, false);
+      audio.setSiren(false);
+    }
     hud.showStats(world.state === 'pause', collectStats());
     hud.setPrompt(world.state === 'pause' ? '' : '');
   }
@@ -562,14 +581,13 @@ function frame(now) {
       const throttle = input.down('KeyW', 'ArrowUp') ? 1 : input.down('KeyS', 'ArrowDown') ? -1 : 0;
       const steer = input.down('KeyA', 'ArrowLeft') ? -1 : input.down('KeyD', 'ArrowRight') ? 1 : 0;
       const handbrake = input.down('Space');
-      const scraped = world.car.update(dt, throttle, steer, city.colliders);
+      const scraped = world.car.update(dt, throttle, steer, city.colliders, handbrake);
       // A scrape wears the car's condition down (shown in the HUD panel).
       if (world.scrapeCooldown > 0) world.scrapeCooldown -= dt;
       if (scraped && world.scrapeCooldown <= 0) {
         world.scrapeCooldown = 0.5;
         world.carCondition = Math.max(15, world.carCondition - 8);
       }
-      if (handbrake) world.car.speed *= Math.max(0, 1 - 3 * dt);
       // Ramming a pedestrian raises the wanted level.
       if (world.pedCooldown > 0) world.pedCooldown -= dt;
       for (const ped of pedestrians) {
@@ -588,6 +606,12 @@ function frame(now) {
       const forward = (input.down('KeyW', 'ArrowUp') ? 1 : 0) - (input.down('KeyS', 'ArrowDown') ? 1 : 0);
       const strafe = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
       walker.update(dt, forward, strafe, chase.yaw, input.down('ShiftLeft', 'ShiftRight'), city.colliders);
+    }
+
+    // A car the player just left keeps rolling and slows down on its own
+    // instead of freezing with its speed stuck.
+    for (const parked of [redConvertible, blackSedan]) {
+      if (parked !== world.car) parked.update(dt, 0, 0, city.colliders);
     }
 
     // Traffic and pedestrians always move.
@@ -663,7 +687,7 @@ function frame(now) {
       colliders: city.colliders,
       missionMarker: mission ? (mission.id === 'delivery' && world.pickedUp ? missions.spots.hotel : mission.marker) : null,
       trafficDots: traffic.map((t) => t.car.pos),
-      policeDots: police.active && police.car ? [police.car.pos] : [],
+      policeDots: police.active ? police.cars.map((c) => c.pos) : [],
       player: { x: playerPos.x, z: playerPos.z, heading: world.driving && world.car ? world.car.heading : walker.heading },
     });
 

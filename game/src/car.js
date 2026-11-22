@@ -24,14 +24,15 @@ export class ArcadeCar {
   }
 
   /** Drive with throttle in [-1, 1] (negative = brake/reverse) and steer in [-1, 1]. */
-  update(dt, throttle, steerInput, colliders) {
-    const maxSteer = 0.55 * (1 - Math.min(Math.abs(this.speed) / CAR.maxSpeed, 0.7) * 0.6);
+  update(dt, throttle, steerInput, colliders, handbrake = false) {
+    const maxSteer = 0.55 * (1 - Math.min(Math.abs(this.speed) / CAR.maxSpeed, 0.7) * 0.6) * (handbrake ? 1.5 : 1);
     const targetSteer = steerInput * maxSteer;
     this.steer += (targetSteer - this.steer) * Math.min(1, 8 * dt);
 
     if (throttle > 0) this.speed += CAR.accel * throttle * dt;
     else if (throttle < 0) this.speed += CAR.brake * throttle * dt;
-    this.speed -= this.speed * CAR.drag * dt;
+    const drag = handbrake ? 0.15 : CAR.drag; // handbrake: slide, don't grip
+    this.speed -= this.speed * drag * dt;
     if (this.speed > CAR.maxSpeed) this.speed = CAR.maxSpeed;
     if (this.speed < -CAR.maxReverse) this.speed = -CAR.maxReverse;
     if (Math.abs(this.speed) < 0.05 && throttle === 0) this.speed = 0;

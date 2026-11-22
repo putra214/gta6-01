@@ -72,7 +72,7 @@ export function buildCarMesh(color, kind, variant = 'sedan') {
   const trimMat = new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.6, metalness: 0.3 });
   const chromeMat = new THREE.MeshStandardMaterial({ color: 0xd8dde2, metalness: 0.9, roughness: 0.22 });
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x0e1a24, metalness: 0.9, roughness: 0.12,
+    color: 0x0e1a24, metalness: 0.9, roughness: 0.12, transparent: true, opacity: 0.9,
   });
   const seatMat = new THREE.MeshStandardMaterial({ color: 0x2a2118, roughness: 0.9 });
 
