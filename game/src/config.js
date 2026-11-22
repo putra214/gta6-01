@@ -37,8 +37,8 @@ export const WANTED = {
 };
 
 export const TRAFFIC = {
-  cars: 8,
-  pedestrians: 10,
+  cars: 12,
+  pedestrians: 16,
   carSpeed: 9, // m/s cruising speed of traffic
   pedSpeed: 1.4, // m/s walking speed of pedestrians
 };

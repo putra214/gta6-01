@@ -56,6 +56,30 @@ export class GameAudio {
     this.sirenGain.connect(this.ctx.destination);
     this.sirenOsc.start();
     this.sirenLfo.start();
+    // City ambience: looped brown noise through a lowpass, very quiet —
+    // distant traffic and wind under everything else. It starts with the
+    // engine so it never plays before the first user gesture.
+    const noiseLen = this.ctx.sampleRate * 2;
+    const noiseBuf = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < noiseLen; i += 1) {
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02; // brown-ish, low rumble
+      data[i] = last * 3.2;
+    }
+    this.ambienceSrc = this.ctx.createBufferSource();
+    this.ambienceSrc.buffer = noiseBuf;
+    this.ambienceSrc.loop = true;
+    const ambFilter = this.ctx.createBiquadFilter();
+    ambFilter.type = 'lowpass';
+    ambFilter.frequency.value = 320;
+    this.ambienceGain = this.ctx.createGain();
+    this.ambienceGain.gain.value = this.muted ? 0 : 0.035;
+    this.ambienceSrc.connect(ambFilter);
+    ambFilter.connect(this.ambienceGain);
+    this.ambienceGain.connect(this.ctx.destination);
+    this.ambienceSrc.start();
   }
 
   /** Engine pitch follows speed (0..1 of top speed). */
@@ -92,6 +116,7 @@ export class GameAudio {
     if (this.ctx) {
       if (this.engineGain) this.engineGain.gain.value = this.muted ? 0 : 0.05;
       if (this.sirenGain) this.sirenGain.gain.value = 0;
+      if (this.ambienceGain) this.ambienceGain.gain.value = this.muted ? 0 : 0.035;
     }
     return this.muted;
   }

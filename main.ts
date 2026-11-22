@@ -9,7 +9,13 @@
 // lighting, the HUD and the cameras in-session; the screenshots below were
 // retaken from the polished game, all four of them staged live in ?shot=
 // scenes: the title screen, a police chase, Dario on foot, and the career
-// stats screen.
+// stats screen. Polish 3 (2026-11-23) rebuilt the visuals again in-session:
+// detailed car models (glass, lamps, rims, bumpers), segmented walkers with
+// a walk cycle, five facade variants with signs, posters and roof props,
+// soft shadows, asphalt and sidewalk textures, layered swaying palms,
+// curved street lamps with real light pools, gutter steam, scattered trash,
+// a procedural city ambience loop, and an optional UnrealBloomPass
+// (?bloom=1, vendored under game/vendor/addons/).
 // Play it: walk Coral Ave as Dario Cruz, steal the red convertible (E),
 // lose the cops, run the pier delivery, take the black sedan to the hideout.
 // Screenshots are real frames of the game (see shots.json for the scenes).

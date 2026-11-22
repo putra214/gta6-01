@@ -64,12 +64,21 @@ export class ChaseCamera {
    * Follow `target` (a {x, z} position) with `heading` (the car's heading
    * when driving, the camera's own yaw when on foot). `colliders` pull the
    * camera in along its own line instead of lifting it over the roofs.
+   * `speed` (m/s) widens the field of view as the car goes faster — the
+   * cheap, honest version of motion blur: the world rushes past instead
+   * of smearing. A real velocity-buffer blur is too heavy for the
+   * software-rendered headless runs this game is tested in.
    */
-  update(dt, target, heading, driving, colliders) {
+  update(dt, target, heading, driving, colliders, speed = 0) {
     const desired = this.desiredPosition(target, heading, driving, colliders);
     const k = 1 - Math.exp(-6 * dt);
     this.smooth.lerp(desired, k);
     this.camera.position.copy(this.smooth);
     this.camera.lookAt(target.x, driving ? 1.4 : 1.3, target.z);
+    const targetFov = driving ? 62 + Math.min(Math.abs(speed) / 30, 1) * 8 : 62;
+    if (Math.abs(this.camera.fov - targetFov) > 0.1) {
+      this.camera.fov = targetFov;
+      this.camera.updateProjectionMatrix();
+    }
   }
 }

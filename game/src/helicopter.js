@@ -4,6 +4,7 @@
 // only: it never chases, shoots or talks to the player, and no HUD element
 // claims otherwise. It exists so the sky has life in every wide shot.
 import * as THREE from 'three';
+import { makeLightPool } from './textures.js';
 
 export class AmbientHelicopter {
   constructor(scene) {
@@ -47,23 +48,18 @@ export class AmbientHelicopter {
     this.group.add(strobe);
 
     // Spotlight cone, pointing straight down, and its pool of light on the
-    // ground. Additive and faint so it reads as light, not geometry.
+    // ground. The pool is a soft radial gradient lying flat on the asphalt
+    // (ground-aligned, fading to transparent at the edge), so it never
+    // reads as a floating yellow shape — the old hard-edged circle did.
     const coneMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffe9a8, transparent: true, opacity: 0.16,
+      color: 0xffe9a8, transparent: true, opacity: 0.1,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     });
-    this.cone = new THREE.Mesh(new THREE.ConeGeometry(7, 55, 12, 1, true), coneMaterial);
+    this.cone = new THREE.Mesh(new THREE.ConeGeometry(4.5, 55, 12, 1, true), coneMaterial);
     this.cone.rotation.x = Math.PI; // apex up at the helicopter
     this.cone.position.y = -27.5;
     this.group.add(this.cone);
-    this.pool = new THREE.Mesh(
-      new THREE.CircleGeometry(6.5, 20),
-      new THREE.MeshBasicMaterial({
-        color: 0xffe9a8, transparent: true, opacity: 0.3,
-        blending: THREE.AdditiveBlending, depthWrite: false,
-      }),
-    );
-    this.pool.rotation.x = -Math.PI / 2;
+    this.pool = makeLightPool(7, 7, 0.15);
     scene.add(this.pool);
 
     this.height = 55; // high enough to clear the tallest roofs

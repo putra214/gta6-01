@@ -1,43 +1,16 @@
 // Sunset Keys — the on-foot walker, Dario Cruz.
 // Camera-relative WASD movement with a FIXED camera yaw: the camera never
 // follows the walker's heading, so input and camera cannot feed back and
-// make the walker spiral. The walker is a small capsule figure with a
-// walk-cycle leg swing.
+// make the walker spiral. Dario is a segmented humanoid (head with a face
+// and flat cap, shirt, arms and legs) whose limbs swing with the walk.
 import * as THREE from 'three';
 import { PLAYER } from './config.js';
 import { resolveCircleVsBuildings } from './city.js';
+import { makeDario, animateHumanoid } from './people.js';
 
-/** Build the walker's mesh: body, head, and two swinging legs. */
+/** Build Dario's mesh: the segmented humanoid from people.js. */
 export function makeWalkerMesh() {
-  const group = new THREE.Group();
-  const shirt = new THREE.MeshLambertMaterial({ color: 0xff8c42 });
-  const skin = new THREE.MeshLambertMaterial({ color: 0xe8b88a });
-  const pants = new THREE.MeshLambertMaterial({ color: 0x2e4a6b });
-
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.7, 4, 8), shirt);
-  body.position.y = 1.05;
-  group.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), skin);
-  head.position.y = 1.85;
-  group.add(head);
-  // Dario's flat cap: a dark disc on the head plus a short brim.
-  const capMaterial = new THREE.MeshLambertMaterial({ color: 0x2e4a6b });
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.29, 0.12, 10), capMaterial);
-  cap.position.y = 2.02;
-  group.add(cap);
-  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, 0.22), capMaterial);
-  brim.position.set(0, 1.98, 0.28);
-  group.add(brim);
-  const legGeometry = new THREE.BoxGeometry(0.22, 0.7, 0.22);
-  const legL = new THREE.Mesh(legGeometry, pants);
-  legL.position.set(-0.16, 0.35, 0);
-  group.add(legL);
-  const legR = new THREE.Mesh(legGeometry, pants);
-  legR.position.set(0.16, 0.35, 0);
-  group.add(legR);
-  group.userData.legL = legL;
-  group.userData.legR = legR;
-  return group;
+  return makeDario();
 }
 
 export class Walker {
@@ -80,8 +53,8 @@ export class Walker {
 
     this.mesh.position.set(this.pos.x, 0, this.pos.z);
     this.mesh.rotation.y = this.heading;
-    const swing = this.speed > 0 ? Math.sin(this.walkPhase) * 0.5 : 0;
-    this.mesh.userData.legL.rotation.x = swing;
-    this.mesh.userData.legR.rotation.x = -swing;
+    animateHumanoid(this.mesh, this.walkPhase, this.speed > 0 ? 1 : 0);
+    // A small bob on each step, so the walk reads even at a distance.
+    this.mesh.position.y = this.speed > 0 ? Math.abs(Math.sin(this.walkPhase)) * 0.05 : 0;
   }
 }

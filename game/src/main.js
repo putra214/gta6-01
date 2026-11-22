@@ -5,7 +5,11 @@
 import * as THREE from 'three';
 import { CITY, COLORS, CAR, WANTED, TRAFFIC } from './config.js';
 import { buildCity } from './city.js';
-import { buildSky } from './sky.js';
+import { buildSky, SUN_DIR } from './sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { AmbientHelicopter } from './helicopter.js';
 import { mulberry32 } from './random.js';
 import { Walker, makeWalkerMesh } from './player.js';
@@ -28,15 +32,33 @@ const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+// Cinematic grade: filmic tone mapping (teal-orange dusk) and soft shadows.
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(COLORS.fog, 90, 320);
+scene.fog = new THREE.Fog(COLORS.fog, 80, 300); // thicker haze for depth
 
 // Low warm sun from the south-west, the direction the sunset comes from.
-const sun = new THREE.DirectionalLight(COLORS.sun, 1.9);
-sun.position.set(-120, 55, 160);
+// It casts soft shadows; the shadow frustum follows the player so the
+// shadows stay crisp where the camera is.
+const sun = new THREE.DirectionalLight(COLORS.sun, 2.4);
+sun.position.copy(SUN_DIR).multiplyScalar(220);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.left = -110;
+sun.shadow.camera.right = 110;
+sun.shadow.camera.top = 110;
+sun.shadow.camera.bottom = -110;
+sun.shadow.camera.near = 10;
+sun.shadow.camera.far = 520;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.6;
 scene.add(sun);
-scene.add(new THREE.HemisphereLight(0x8a6a9a, 0x5a4030, 0.75));
+scene.add(sun.target);
+scene.add(new THREE.HemisphereLight(0x9a7ab0, 0x7a5540, 1.3));
 
 const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 800);
 const chase = new ChaseCamera(camera);
@@ -56,15 +78,16 @@ const walker = new Walker(makeWalkerMesh(), 0, -72);
 scene.add(walker.mesh);
 
 // Stealable cars, parked ON roads so the approach is never blocked.
-function parkStealable(color, x, z, heading) {
-  const mesh = makeCarMesh(color, 'player');
+function parkStealable(color, x, z, heading, variant = 'sedan') {
+  const mesh = makeCarMesh(color, 'player', variant);
   scene.add(mesh);
   const car = new ArcadeCar(mesh, x, z, heading);
   car.update(0, 0, 0, city.colliders); // sync the mesh once
   return car;
 }
-const redConvertible = parkStealable(0xd23b2e, missions.spots.stealCarSpot.x, missions.spots.stealCarSpot.z, Math.PI / 2);
-const blackSedan = parkStealable(0x1a1a1a, 78, -6, Math.PI);
+// The red hero car is an open-top convertible; the black sedan is closed.
+const redConvertible = parkStealable(0xd23b2e, missions.spots.stealCarSpot.x, missions.spots.stealCarSpot.z, Math.PI / 2, 'convertible');
+const blackSedan = parkStealable(0x1a1a1a, 78, -6, Math.PI, 'sedan');
 
 // ---------------------------------------------------------------------------
 // Save
@@ -435,6 +458,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
 });
 window.addEventListener('beforeunload', writeSave);
 
@@ -465,10 +489,44 @@ if (shotName) {
   hud.setRadio(RADIO_TRACKS[0]);
 }
 
+// Bloom (UnrealBloomPass, vendored under game/vendor/addons/) is opt-in
+// with ?bloom=1: it makes the headlights, lit windows and the sun glow,
+// but it costs extra render passes, so it stays off unless asked for.
+const bloomOn = params.get('bloom') === '1';
+let composer = null;
+if (bloomOn) {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.25, 0.55, 0.9,
+  ));
+  composer.addPass(new OutputPass());
+}
+
 function frame(now) {
   const dt = Math.min(0.05, Math.max(0.001, (now - lastNow) / 1000));
   lastNow = now;
   world.time += dt;
+
+  // The sun's shadow frustum follows the player so shadows stay crisp
+  // where the camera is, and the light always comes from the sunset.
+  const anchor = world.driving && world.car ? world.car.pos : walker.pos;
+  sun.position.set(anchor.x + SUN_DIR.x * 220, SUN_DIR.y * 220, anchor.z + SUN_DIR.z * 220);
+  sun.target.position.set(anchor.x, 0, anchor.z);
+  sun.target.updateMatrixWorld();
+  // Palm canopies sway in the evening wind; gutter steam rises and fades.
+  for (const t of city.trees) {
+    const s = Math.sin(world.time * 0.8 + t.phase) * 0.05;
+    t.mesh.rotation.z = t.baseRot + s;
+    t.mesh.position.x = t.baseX + s * 0.6;
+  }
+  for (const st of city.steam) {
+    const tt = (world.time * 0.22 + st.phase) % 1;
+    st.mesh.position.y = 0.4 + tt * 2.0;
+    const sc = 0.7 + tt * 1.1;
+    st.mesh.scale.set(sc, 0.9 + tt * 1.3, 1);
+    st.mesh.material.opacity = 0.22 * (1 - tt);
+  }
 
   if (world.state === 'menu') {
     // Slow establishing orbit over the city behind the start menu.
@@ -573,7 +631,8 @@ function frame(now) {
     }
 
     // Camera follows the walker or the car; the helicopter circles above.
-    chase.update(dt, playerPos, world.driving && world.car ? world.car.heading : 0, world.driving, city.colliders);
+    // The car's speed goes to the camera so the FOV widens as it rushes.
+    chase.update(dt, playerPos, world.driving && world.car ? world.car.heading : 0, world.driving, city.colliders, world.driving && world.car ? world.car.speed : walker.speed);
     heli.update(dt, playerPos);
 
     // HUD.
@@ -612,7 +671,10 @@ function frame(now) {
     audio.setSiren(world.wanted > 0);
   }
 
-  renderer.render(scene, camera);
+  // One render path: the composer when bloom is on, the plain renderer
+  // otherwise (never both — that would draw the scene twice).
+  if (composer) composer.render();
+  else renderer.render(scene, camera);
 }
 
 // Test hook: the probe scripts read the live state from here.

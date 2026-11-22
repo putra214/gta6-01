@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { TRAFFIC, CAR } from './config.js';
 import { ArcadeCar, makeCarMesh } from './car.js';
 import { resolveCircleVsBuildings } from './city.js';
+import { makePedestrian, animateHumanoid } from './people.js';
 import { mulberry32, range, pick } from './random.js';
 
 /** A traffic car that loops a rectangle of four road lines. */
@@ -78,28 +79,8 @@ export class Pedestrian {
     this.mesh.position.set(this.pos.x, 0, this.pos.z);
     this.mesh.rotation.y = Math.atan2(nx, nz);
     this.mesh.position.y = Math.abs(Math.sin(this.phase)) * 0.06;
+    animateHumanoid(this.mesh, this.phase, 1);
   }
-}
-
-function makePedestrianMesh(shirtColor) {
-  const group = new THREE.Group();
-  const shirt = new THREE.MeshLambertMaterial({ color: shirtColor });
-  const skin = new THREE.MeshLambertMaterial({ color: 0xd8a077 });
-  const pants = new THREE.MeshLambertMaterial({ color: 0x333a44 });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.6, 4, 8), shirt);
-  body.position.y = 0.95;
-  group.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), skin);
-  head.position.y = 1.65;
-  group.add(head);
-  const legGeometry = new THREE.BoxGeometry(0.18, 0.6, 0.18);
-  const legL = new THREE.Mesh(legGeometry, pants);
-  legL.position.set(-0.13, 0.3, 0);
-  group.add(legL);
-  const legR = new THREE.Mesh(legGeometry, pants);
-  legR.position.set(0.13, 0.3, 0);
-  group.add(legR);
-  return group;
 }
 
 /**
@@ -110,7 +91,6 @@ export function buildTraffic(scene, city, seed) {
   const rng = mulberry32(seed + 77);
   const traffic = [];
   const pedestrians = [];
-  const pedShirts = [0x4a90d9, 0xe05a7a, 0x7ac74f, 0xf2a541, 0x9b59b6, 0x1abc9c];
 
   for (let i = 0; i < TRAFFIC.cars; i += 1) {
     const xLine = city.roadLineAt(i);
@@ -131,7 +111,7 @@ export function buildTraffic(scene, city, seed) {
 
   for (let i = 0; i < TRAFFIC.pedestrians; i += 1) {
     const p = city.roadPoint();
-    const mesh = makePedestrianMesh(pick(rng, pedShirts));
+    const mesh = makePedestrian(rng);
     scene.add(mesh);
     pedestrians.push(new Pedestrian(mesh, p.x, p.z));
   }

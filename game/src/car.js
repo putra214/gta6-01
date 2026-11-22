@@ -6,52 +6,11 @@
 import * as THREE from 'three';
 import { CAR } from './config.js';
 import { resolveCircleVsBuildings } from './city.js';
+import { buildCarMesh, randomCarColor } from './car-model.js';
 
-const BODY_COLORS = [0xd23b2e, 0x2e6fd2, 0xf2c230, 0x3fae6a, 0x8a5fd2, 0xe8e8e8, 0x222831];
-
-/** Build a low-poly car mesh. `kind` is 'player' | 'traffic' | 'police'. */
-export function makeCarMesh(color, kind) {
-  const group = new THREE.Group();
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color });
-  const darkMaterial = new THREE.MeshLambertMaterial({ color: 0x1c2733 });
-  const glassMaterial = new THREE.MeshLambertMaterial({ color: 0x9fd8e8 });
-  const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x141414 });
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 4.2), bodyMaterial);
-  body.position.y = 0.55;
-  group.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.5, 2.1), glassMaterial);
-  cabin.position.set(0, 1.05, -0.2);
-  group.add(cabin);
-  const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.25, 0.3), darkMaterial);
-  bumper.position.set(0, 0.35, 2.1);
-  group.add(bumper);
-
-  const wheels = [];
-  const wheelGeometry = new THREE.CylinderGeometry(0.36, 0.36, 0.3, 10);
-  wheelGeometry.rotateZ(Math.PI / 2);
-  for (const [wx, wz] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]]) {
-    const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-    wheel.position.set(wx, 0.36, wz);
-    group.add(wheel);
-    wheels.push(wheel);
-  }
-
-  if (kind === 'police') {
-    const barMaterial = new THREE.MeshBasicMaterial({ color: 0xff2020 });
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.18, 0.4), barMaterial);
-    bar.position.set(0, 1.42, -0.2);
-    group.add(bar);
-    group.userData.lightBar = bar;
-  }
-  if (kind === 'player') {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.1, 4.22), new THREE.MeshLambertMaterial({ color: 0xffffff }));
-    stripe.position.y = 0.72;
-    group.add(stripe);
-  }
-
-  group.userData.wheels = wheels;
-  return group;
+/** Build a detailed car mesh. `kind` is 'player' | 'traffic' | 'police'. */
+export function makeCarMesh(color, kind, variant = 'sedan') {
+  return buildCarMesh(color, kind, variant);
 }
 
 /** Arcade car: position, heading, speed, steer — shared by all drivers. */
@@ -118,6 +77,6 @@ export class ArcadeCar {
 
   /** A random body colour for traffic cars. */
   static randomColor(rng) {
-    return BODY_COLORS[Math.floor(rng() * BODY_COLORS.length)];
+    return randomCarColor(rng);
   }
 }

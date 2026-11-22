@@ -1,9 +1,15 @@
 // Sunset Keys — the sunset sky.
 // Everything procedural: a canvas gradient for the dusk background, a low
-// sun disc with a glow, flattened-sphere clouds, and instanced street lamps
-// along the road lines so the city reads as evening, not noon.
+// sun disc with a glow, flattened-sphere clouds, and street lamps along the
+// road lines so the city reads as evening, not noon. Each lamp has a curved
+// arm reaching over the road and a soft pool of light on the asphalt below
+// it — the light actually lands on the street instead of floating in the air.
 import * as THREE from 'three';
 import { mulberry32, range } from './random.js';
+import { glowTexture } from './textures.js';
+
+/** The sunset direction: low in the south-west sky. */
+export const SUN_DIR = new THREE.Vector3(-0.55, 0.32, 0.78).normalize();
 
 /** Vertical dusk gradient, deep violet up top to gold at the horizon. */
 function makeSkyTexture() {
@@ -33,7 +39,7 @@ export function buildSky(scene, roadLines) {
   scene.background = makeSkyTexture();
 
   // Low sun in the south-west sky, the direction the warm light comes from.
-  const sunDir = new THREE.Vector3(-0.55, 0.26, 0.78).normalize();
+  const sunDir = SUN_DIR;
   const glow = new THREE.Mesh(
     new THREE.CircleGeometry(46, 32),
     new THREE.MeshBasicMaterial({ color: 0xff9a4d, transparent: true, opacity: 0.35, fog: false }),
@@ -68,33 +74,68 @@ export function buildSky(scene, roadLines) {
     }
   }
 
-  // Street lamps: one instanced pole + one instanced glowing globe per lamp,
-  // along every road line, alternating sides, so the streets glow at dusk.
+  // Street lamps along every road line, alternating sides. Each lamp is a
+  // pole at the curb, a curved arm reaching over the road, a glowing globe
+  // at the arm's end, and a soft pool of light on the asphalt below the
+  // globe — so the lamps genuinely light the street.
   const half = 136;
   const positions = [];
   for (const line of roadLines) {
     for (let d = -half + 14; d < half - 10; d += 26) {
       const side = Math.floor(d / 26) % 2 === 0 ? 6.8 : -6.8;
-      positions.push({ x: line + side, z: d });
-      positions.push({ x: d, z: line + side });
+      // Beside a vertical road line: pole at (line + side, d), arm reaching
+      // toward the road in -x/+x. Beside a horizontal line: the same in z.
+      positions.push({ x: line + side, z: d, arm: 'x', armSign: -Math.sign(side) });
+      positions.push({ x: d, z: line + side, arm: 'z', armSign: -Math.sign(side) });
     }
   }
+  const dummy = new THREE.Object3D();
+
+  // Poles: vertical cylinders at the curb.
   const poleGeometry = new THREE.CylinderGeometry(0.09, 0.13, 4.4, 6);
   const poleMaterial = new THREE.MeshLambertMaterial({ color: 0x2a2f36 });
   const poles = new THREE.InstancedMesh(poleGeometry, poleMaterial, positions.length);
+  // Arms: short horizontal cylinders from the pole top toward the road.
+  const armGeometry = new THREE.CylinderGeometry(0.06, 0.06, 1.7, 6);
+  const arms = new THREE.InstancedMesh(armGeometry, poleMaterial, positions.length);
+  // Globes: glowing spheres at the arm ends.
   const globeGeometry = new THREE.SphereGeometry(0.38, 8, 6);
   const globeMaterial = new THREE.MeshBasicMaterial({ color: 0xffd27a });
   const globes = new THREE.InstancedMesh(globeGeometry, globeMaterial, positions.length);
-  const dummy = new THREE.Object3D();
+  // Light pools: soft radial gradients on the asphalt under each globe.
+  // Kept small and faint: at the low chase/foot camera a ground glow is
+  // seen at a grazing angle, and a big bright pool smears into a streak.
+  const poolGeometry = new THREE.PlaneGeometry(5, 5);
+  const poolMaterial = new THREE.MeshBasicMaterial({
+    map: glowTexture(), color: 0xffd27a, transparent: true,
+    opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const pools = new THREE.InstancedMesh(poolGeometry, poolMaterial, positions.length);
+
   positions.forEach((p, i) => {
+    const gx = p.arm === 'x' ? p.x + p.armSign * 1.6 : p.x; // globe x
+    const gz = p.arm === 'z' ? p.z + p.armSign * 1.6 : p.z; // globe z
     dummy.position.set(p.x, 2.2, p.z);
     dummy.rotation.set(0, 0, 0);
     dummy.updateMatrix();
     poles.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(p.x, 4.5, p.z);
+    // The arm: horizontal, from the pole top toward the globe.
+    dummy.position.set(p.x + (p.arm === 'x' ? p.armSign * 0.8 : 0), 4.35, p.z + (p.arm === 'z' ? p.armSign * 0.8 : 0));
+    dummy.rotation.set(p.arm === 'x' ? 0 : Math.PI / 2, 0, p.arm === 'x' ? Math.PI / 2 : 0);
+    dummy.updateMatrix();
+    arms.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(gx, 4.3, gz);
+    dummy.rotation.set(0, 0, 0);
     dummy.updateMatrix();
     globes.setMatrixAt(i, dummy.matrix);
+    // The pool lies flat on the asphalt under the globe.
+    dummy.position.set(gx, 0.05, gz);
+    dummy.rotation.set(-Math.PI / 2, 0, 0);
+    dummy.updateMatrix();
+    pools.setMatrixAt(i, dummy.matrix);
   });
   scene.add(poles);
+  scene.add(arms);
   scene.add(globes);
+  scene.add(pools);
 }
