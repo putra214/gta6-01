@@ -83,7 +83,10 @@ export class ArcadeCar {
     const fz = Math.cos(this.heading);
     let nx = this.pos.x + fx * this.speed * dt;
     let nz = this.pos.z + fz * this.speed * dt;
-    const half = 136; // city half-size plus margin; keep cars inside the map
+    const half = 152; // city half-size plus margin; keep cars inside the map.
+    // 152, not 136: the marina pickup sits at z=148 on the beach, and the
+    // car must be able to reach it (pickup radius 7 m). The sea starts
+    // well past 156, so 152 still keeps cars out of the water.
     nx = Math.max(-half, Math.min(half, nx));
     nz = Math.max(-half, Math.min(half, nz));
 
