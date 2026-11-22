@@ -1,61 +1,58 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
+// Sunset Keys — shared tuning constants for the whole game.
+// One place for every number the systems agree on: city size, speeds,
+// wanted rules and mission rewards. Nothing here is read from the network.
+export const CITY = {
+  blocks: 5, // 5x5 blocks
+  blockSize: 40, // metres of building block per side
+  roadWidth: 12, // metres of road between blocks
+  // pitch = block + road; the city spans blocks*pitch + roadWidth metres.
+  get pitch() { return this.blockSize + this.roadWidth; },
+  get size() { return this.blocks * this.pitch + this.roadWidth; },
+};
 
 export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
+  walkSpeed: 6, // m/s
+  sprintSpeed: 9, // m/s while Shift is held
+  radius: 0.5,
 };
 
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
+export const CAR = {
+  accel: 16, // m/s^2
+  brake: 34, // m/s^2
+  maxSpeed: 30, // m/s (~108 km/h)
+  maxReverse: 10,
+  drag: 0.6, // /s rolling drag
+  wheelBase: 2.7, // m
+  radius: 1.6,
+  stealRadius: 4.5, // m from the walker to press E
 };
 
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
+export const WANTED = {
+  maxStars: 5,
+  heatDecaySeconds: 20, // seconds out of police sight before heat falls
+  policeSight: 45, // m — closer than this, the police see you
+  policeSpeed: 26, // m/s — slightly below the player's top speed
+  bustSeconds: 2, // seconds a cop must touch a slow player to bust them
 };
 
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
+export const TRAFFIC = {
+  cars: 8,
+  pedestrians: 10,
+  carSpeed: 9, // m/s cruising speed of traffic
+  pedSpeed: 1.4, // m/s walking speed of pedestrians
 };
 
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+export const MISSIONS = {
+  rewards: [400, 300, 600], // cash per mission, in order
+};
 
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
+export const COLORS = {
+  sky: 0x87b5d9,
+  fog: 0xcfd8e0,
+  sun: 0xfff2d0,
+  sand: 0xe8cf9e,
+  sea: 0x2e7f9e,
+  road: 0x3a3f46,
+  sidewalk: 0x9aa0a3,
+  grass: 0x6fae5f,
+};
