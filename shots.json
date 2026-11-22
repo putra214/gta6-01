@@ -1,5 +1,1 @@
-[
-  { "name": "1-start.jpg", "query": "?shot=start&seed=1" },
-  { "name": "2-play.jpg", "query": "?shot=play&seed=1" },
-  { "name": "3-end.jpg", "query": "?shot=end&seed=1" }
-]
+[{"name":"1-cover.jpg","query":"?shot=cover","scene":"Driving the red convertible down Coral Ave with the HUD, minimap and mission text on screen"},{"name":"2-chase.jpg","query":"?shot=chase","scene":"Police chase: wanted 2 stars, the police car right behind, speed and minimap visible"},{"name":"3-foot.jpg","query":"?shot=foot","scene":"On foot beside the red convertible with the 'Press E to steal' prompt"},{"name":"4-mission.jpg","query":"?shot=mission","scene":"Pier Run: driving toward the marina pickup with the mission marker on the minimap"}]
