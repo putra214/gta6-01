@@ -489,10 +489,11 @@ if (shotName) {
   hud.setRadio(RADIO_TRACKS[0]);
 }
 
-// Bloom (UnrealBloomPass, vendored under game/vendor/addons/) is opt-in
-// with ?bloom=1: it makes the headlights, lit windows and the sun glow,
-// but it costs extra render passes, so it stays off unless asked for.
-const bloomOn = params.get('bloom') === '1';
+// Bloom (UnrealBloomPass, vendored under game/vendor/addons/) is on by
+// default: it makes the headlights, lit windows and the sun glow, so the
+// game looks the way the submitted screenshots do. It costs extra render
+// passes; pass ?bloom=0 to turn it off.
+const bloomOn = params.get('bloom') !== '0';
 let composer = null;
 if (bloomOn) {
   composer = new EffectComposer(renderer);
