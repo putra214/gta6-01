@@ -5,23 +5,68 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sunset Keys — Solmar Bay</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1a24; font-family: Verdana, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a0f2e; font-family: Verdana, sans-serif; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   .hud { position: fixed; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.8); z-index: 5; pointer-events: none; }
-  #stars { top: 12px; left: 14px; font-size: 30px; color: #ffd23f; letter-spacing: 2px; visibility: hidden; }
-  #mission { top: 52px; left: 14px; font-size: 15px; max-width: 520px; line-height: 1.4; }
-  #cash { top: 12px; right: 14px; font-size: 22px; font-weight: bold; color: #7dff9a; }
-  #speed { bottom: 14px; right: 16px; font-size: 26px; font-weight: bold; }
+  #stars { top: 12px; left: 14px; font-size: 34px; color: #ffd23f; letter-spacing: 2px; visibility: hidden; }
+  /* Mission panel: title, objective, real checklist, reward. */
+  #mission { top: 56px; left: 14px; max-width: 380px; background: rgba(12, 10, 28, .62); border-left: 4px solid #ffb347; padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.45; }
+  #mission .m-title { font-size: 15px; font-weight: bold; color: #ffb347; letter-spacing: 1px; margin-bottom: 3px; }
+  #mission .m-text { color: #fff; }
+  #mission .step { color: #cfd8e8; margin-top: 2px; }
+  #mission .step.done { color: #7dff9a; }
+  #mission .m-reward { margin-top: 5px; font-size: 12px; font-weight: bold; color: #7dff9a; letter-spacing: 1px; }
+  /* Police dispatch panel, only while wanted. */
+  #dispatch { top: 218px; left: 14px; width: 300px; background: rgba(40, 8, 16, .66); border-left: 4px solid #ff4040; padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 12px; line-height: 1.5; display: none; }
+  #dispatch .d-title { font-size: 12px; font-weight: bold; color: #ff8080; letter-spacing: 2px; }
+  #dispatch .heat-bar { height: 6px; background: rgba(255,255,255,.18); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  #dispatch .heat-bar div { height: 100%; width: 0%; background: #ff8c42; }
+  #dispatch .heat-label { font-size: 10px; color: #ffb347; letter-spacing: 1px; margin-top: 3px; }
+  /* Vehicle panel, top right under the cash. */
+  #vehicle { top: 52px; right: 14px; width: 210px; background: rgba(12, 10, 28, .62); padding: 8px 12px; border-radius: 8px; font-size: 12px; text-align: right; line-height: 1.5; }
+  #vehicle-name { font-weight: bold; letter-spacing: 1px; color: #ffe9a8; }
+  #vehicle .cond-bar { height: 6px; background: rgba(255,255,255,.18); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  #vehicle .cond-bar div { height: 100%; width: 100%; background: #39d353; }
+  #cond-text { font-size: 10px; color: #cfd8e8; }
+  #cash { top: 12px; right: 14px; font-size: 26px; font-weight: bold; color: #7dff9a; }
+  #radio { top: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #ffd9a0; letter-spacing: 1px; background: rgba(12, 10, 28, .45); padding: 4px 12px; border-radius: 12px; }
+  #speed { bottom: 14px; right: 16px; font-size: 34px; font-weight: bold; }
   #controls { bottom: 14px; left: 14px; font-size: 12px; opacity: .85; line-height: 1.5; }
-  #prompt { bottom: 90px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: bold; visibility: hidden; background: rgba(0,0,0,.55); padding: 8px 16px; border-radius: 8px; }
-  #minimap { position: fixed; right: 14px; bottom: 56px; width: 180px; height: 180px; border: 2px solid rgba(255,255,255,.6); border-radius: 6px; z-index: 5; background: #10141a; }
+  #prompt { bottom: 96px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: bold; visibility: hidden; background: rgba(0,0,0,.55); padding: 8px 16px; border-radius: 8px; }
+  /* Dialog: procedural portrait + speaker + line, bottom left. */
+  #dialog { bottom: 78px; left: 14px; display: none; align-items: center; gap: 10px; max-width: 460px; background: rgba(12, 10, 28, .78); border: 1px solid rgba(255, 179, 71, .5); padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.4; }
+  #portrait { width: 56px; height: 56px; border-radius: 6px; flex: none; }
+  #dialog-name { font-size: 11px; font-weight: bold; color: #ffb347; letter-spacing: 1px; }
+  #minimap { position: fixed; right: 14px; bottom: 62px; width: 180px; height: 180px; border: 2px solid rgba(255,255,255,.6); border-radius: 6px; z-index: 5; background: #10141a; }
+  /* District card: big GTA-style place name, fades in and out. */
+  #district { position: fixed; top: 30%; left: 0; right: 0; text-align: center; z-index: 6; pointer-events: none; opacity: 0; transition: opacity .6s; }
+  #district.show { opacity: 1; }
+  #district-name { font-size: 44px; font-weight: bold; letter-spacing: 8px; color: #fff; text-shadow: 0 2px 0 #b33a1a, 0 4px 16px rgba(0,0,0,.7); }
+  #district-sub { font-size: 14px; letter-spacing: 4px; color: #ffd9a0; text-shadow: 0 1px 6px rgba(0,0,0,.8); margin-top: 4px; }
   .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; color: #fff; text-align: center; background: rgba(8, 18, 28, .72); }
   .overlay h1 { font-size: 52px; margin: 0 0 8px; color: #ffb347; letter-spacing: 3px; text-shadow: 0 3px 0 #b33a1a, 0 6px 18px rgba(0,0,0,.6); }
   .overlay h2 { font-size: 20px; margin: 0 0 18px; font-weight: normal; color: #ffe9a8; }
   .overlay p { max-width: 560px; line-height: 1.6; font-size: 15px; margin: 6px 0; }
   .overlay button { margin-top: 20px; font-size: 20px; padding: 12px 34px; border: none; border-radius: 8px; background: #ff8c42; color: #fff; font-weight: bold; cursor: pointer; }
   .overlay button:hover { background: #ff9d5c; }
-  #gameover, #win { display: none; }
+  #gameover, #win, #stats { display: none; }
+  /* Career stats: a pause screen with only real, counted numbers. */
+  #stats .panel { background: rgba(12, 10, 28, .88); border: 1px solid rgba(255, 179, 71, .55); border-radius: 12px; padding: 26px 34px; min-width: 420px; }
+  #stats h1 { font-size: 34px; }
+  #stats table { margin: 10px auto 4px; font-size: 15px; border-collapse: collapse; }
+  #stats td { padding: 5px 18px; text-align: left; }
+  #stats td:last-child { text-align: right; font-weight: bold; color: #7dff9a; }
+  #stats .hint { font-size: 12px; opacity: .75; margin-top: 14px; }
+  /* Screenshot modes: hide the in-game HUD so the title / stats own the frame. */
+  body.shot-title #stars, body.shot-title #mission, body.shot-title #dispatch,
+  body.shot-title #vehicle, body.shot-title #cash, body.shot-title #radio,
+  body.shot-title #speed, body.shot-title #controls, body.shot-title #prompt,
+  body.shot-title #dialog, body.shot-title #minimap, body.shot-title #district,
+  body.shot-stats #stars, body.shot-stats #mission, body.shot-stats #dispatch,
+  body.shot-stats #vehicle, body.shot-stats #cash, body.shot-stats #radio,
+  body.shot-stats #speed, body.shot-stats #controls, body.shot-stats #prompt,
+  body.shot-stats #dialog, body.shot-stats #minimap, body.shot-stats #district { display: none; }
+  body.shot-title #menu { background: linear-gradient(rgba(24, 10, 40, .30), rgba(24, 10, 40, .62)); }
   #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 </style>
 </head>
@@ -29,10 +74,27 @@
 <canvas id="game" aria-label="Sunset Keys: an open-world crime game in Solmar Bay"></canvas>
 <div id="stars" class="hud">☆☆☆☆☆</div>
 <div id="mission" class="hud"></div>
+<div id="dispatch" class="hud">
+  <div class="d-title">SBPD DISPATCH</div>
+  <div id="dispatch-body"></div>
+  <div class="heat-bar"><div id="heat-fill"></div></div>
+  <div class="heat-label">HEAT — OUT OF SIGHT TO COOL OFF</div>
+</div>
+<div id="vehicle" class="hud">
+  <div id="vehicle-name">ON FOOT</div>
+  <div class="cond-bar"><div id="cond-fill"></div></div>
+  <div id="cond-text">COND 100%</div>
+</div>
 <div id="cash" class="hud">$0</div>
+<div id="radio" class="hud"></div>
 <div id="speed" class="hud">0 km/h</div>
 <div id="controls" class="hud">WASD drive / walk &nbsp;·&nbsp; E steal car &nbsp;·&nbsp; Space handbrake<br>Shift sprint &nbsp;·&nbsp; P pause &nbsp;·&nbsp; M mute &nbsp;·&nbsp; drag mouse to look</div>
 <div id="prompt" class="hud"></div>
+<div id="dialog" class="hud">
+  <canvas id="portrait" width="56" height="56"></canvas>
+  <div><div id="dialog-name"></div><div id="dialog-text"></div></div>
+</div>
+<div id="district"><div id="district-name"></div><div id="district-sub"></div></div>
 <canvas id="minimap" width="180" height="180"></canvas>
 
 <div id="menu" class="overlay">
@@ -42,6 +104,22 @@
   <p>WASD to walk and drive · E to steal a car · Space for the handbrake · Shift to sprint · P to pause</p>
   <button id="start-btn">START ENGINE</button>
   <p style="font-size:12px; opacity:.75">Best cash this browser: <span id="best">$0</span> · progress saves automatically</p>
+</div>
+
+<div id="stats" class="overlay">
+  <div class="panel">
+    <h1>CAREER</h1>
+    <h2>Dario Cruz — Solmar Bay</h2>
+    <table>
+      <tr><td>Jobs done</td><td id="st-jobs">0/3</td></tr>
+      <tr><td>Cash banked</td><td id="st-cash">$0</td></tr>
+      <tr><td>Best cash</td><td id="st-best">$0</td></tr>
+      <tr><td>Cars stolen</td><td id="st-stolen">0</td></tr>
+      <tr><td>Police escapes</td><td id="st-escapes">0</td></tr>
+      <tr><td>Save</td><td id="st-save">SAVE SLOT 1 — AUTO</td></tr>
+    </table>
+    <p class="hint">Paused — press P to get back to the street.</p>
+  </div>
 </div>
 
 <div id="gameover" class="overlay">

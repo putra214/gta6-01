@@ -48,11 +48,11 @@ export const MISSIONS = {
 };
 
 export const COLORS = {
-  sky: 0x87b5d9,
-  fog: 0xcfd8e0,
-  sun: 0xfff2d0,
-  sand: 0xe8cf9e,
-  sea: 0x2e7f9e,
+  sky: 0x2a1a4e, // deep violet dusk — the top of the sunset gradient
+  fog: 0xe8906a, // warm sunset haze on the horizon
+  sun: 0xffb347, // low warm sun, from the south-west
+  sand: 0xe8b98a,
+  sea: 0x3a6a8a, // dusk sea, dark teal under a violet sky
   road: 0x3a3f46,
   sidewalk: 0x9aa0a3,
   grass: 0x6fae5f,

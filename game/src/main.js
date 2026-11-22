@@ -3,8 +3,11 @@
 // three jobs for Dario Cruz, and bank the cash. The city is Solmar Bay, a
 // sun-soaked coastal town of its own; nothing here is from a commercial game.
 import * as THREE from 'three';
-import { CITY, COLORS, CAR } from './config.js';
+import { CITY, COLORS, CAR, WANTED, TRAFFIC } from './config.js';
 import { buildCity } from './city.js';
+import { buildSky } from './sky.js';
+import { AmbientHelicopter } from './helicopter.js';
+import { mulberry32 } from './random.js';
 import { Walker, makeWalkerMesh } from './player.js';
 import { ArcadeCar, makeCarMesh } from './car.js';
 import { buildTraffic } from './traffic.js';
@@ -27,18 +30,20 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(COLORS.sky);
 scene.fog = new THREE.Fog(COLORS.fog, 90, 320);
 
-const sun = new THREE.DirectionalLight(COLORS.sun, 1.6);
-sun.position.set(80, 140, 40);
+// Low warm sun from the south-west, the direction the sunset comes from.
+const sun = new THREE.DirectionalLight(COLORS.sun, 1.9);
+sun.position.set(-120, 55, 160);
 scene.add(sun);
-scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.9));
+scene.add(new THREE.HemisphereLight(0x8a6a9a, 0x5a4030, 0.75));
 
 const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 800);
 const chase = new ChaseCamera(camera);
 
 const city = buildCity(scene, SEED);
+buildSky(scene, city.roadLines);
+const heli = new AmbientHelicopter(scene);
 const hud = new Hud(document);
 const audio = new GameAudio();
 const input = createInput(canvas);
@@ -106,6 +111,12 @@ const world = {
   tookSedan: false, // the black sedan was stolen (job 3's car)
   pedCooldown: 0,
   time: 0,
+  carsStolen: 0, // career counters: kept across retries in one session
+  escapes: 0,
+  carCondition: 100, // 100 = showroom; building scrapes wear it down
+  scrapeCooldown: 0,
+  district: '',
+  lastMissionIndex: -1,
 };
 
 function resetWorld() {
@@ -136,20 +147,78 @@ function resetWorld() {
   hud.showMenu(false);
   hud.showGameOver(false);
   hud.showWin(false);
+  hud.showStats(false);
+  world.carCondition = 100;
+  world.district = '';
   updateMissionText();
+}
+
+const RADIO_TRACKS = [
+  'Sunset Drive — The Palms',
+  'Coral Ave Nights — DJ Marisol',
+  'Getaway Groove — The Hideouts',
+];
+
+// Dialog lines, spoken when a real mission event happens. MIRA is Dario's
+// fixer on the phone; DARIO answers. Nothing here invents a system — the
+// lines only narrate events the game really just did.
+const DIALOG = {
+  jobStart: [
+    ['MIRA', 'The red convertible is on Coral Ave. Take it, then lose the cops.'],
+    ['MIRA', 'Package is waiting at the marina. Hotel Solmar, no detours.'],
+    ['MIRA', 'Last one. Black sedan, then the hideout. Don\'t get cute.'],
+  ],
+  escaped: ['DARIO', 'Clean. One job down, two to go.'],
+  pickedUp: ['DARIO', 'Package secured. Rolling to the hotel.'],
+  delivered: ['MIRA', 'Delivered. The hotel pays on time, for once.'],
+};
+
+function collectStats() {
+  return {
+    missionsDone: world.missionsDone,
+    cash: world.cash,
+    bestCash: world.bestCash,
+    carsStolen: world.carsStolen,
+    escapes: world.escapes,
+  };
 }
 
 function updateMissionText() {
   const mission = missions.current;
   if (!mission) {
-    hud.setMission('All jobs done. Solmar Bay is yours.');
+    hud.setMissionText('All jobs done. Solmar Bay is yours.');
     return;
   }
-  let text = `${mission.title} — ${mission.text}`;
-  if (mission.id === 'delivery' && world.pickedUp) {
-    text = 'JOB 2 — PIER RUN — Package collected. Deliver it to the Hotel Solmar.';
+  // The checklist is the mission's real objectives with their real state.
+  let steps;
+  if (mission.id === 'steal') {
+    steps = [
+      { label: 'Steal the red convertible', done: world.stolen },
+      { label: 'Lose the cops', done: world.escaped },
+    ];
+  } else if (mission.id === 'delivery') {
+    steps = [
+      { label: 'Pick up the package at the marina', done: world.pickedUp },
+      { label: 'Deliver it to the Hotel Solmar', done: world.delivered },
+    ];
+  } else {
+    steps = [
+      { label: 'Take the black sedan', done: world.tookSedan },
+      { label: 'Reach the hideout', done: world.atHideout },
+    ];
   }
-  hud.setMission(text);
+  let text = mission.text;
+  if (mission.id === 'delivery' && world.pickedUp) {
+    text = 'Package collected. Deliver it to the Hotel Solmar.';
+  }
+  hud.setMission(missions.index + 1, missions.list.length, mission.title, text, steps, mission.reward);
+  hud.setRadio(RADIO_TRACKS[missions.index] ?? RADIO_TRACKS[0]);
+  // New job: the fixer calls with the briefing.
+  if (missions.index !== world.lastMissionIndex) {
+    world.lastMissionIndex = missions.index;
+    const line = DIALOG.jobStart[missions.index];
+    if (line) hud.showDialog(line[0], line[1]);
+  }
 }
 
 function nearestStealable() {
@@ -166,6 +235,8 @@ function stealCar(car) {
   world.driving = true;
   world.car = car;
   world.stolen = true;
+  world.carsStolen += 1;
+  world.carCondition = 100; // a fresh car is in showroom condition
   if (car === blackSedan) world.tookSedan = true;
   world.wanted = Math.max(world.wanted, 1);
   police.raise(1, walker.pos, city.colliders);
@@ -207,58 +278,131 @@ function completeMissionIfReady() {
 }
 
 // ---------------------------------------------------------------------------
-// Scripted screenshot scenes (?shot=cover|chase|foot|mission)
+// Scripted screenshot scenes (?shot=title|chase|foot|stats)
 // Each stages the real game at a fixed moment so the frame is what a short
-// play session really looks like, with the same seed every time.
+// play session really looks like, with the same seed every time. Returns the
+// state the shot runs in: 'menu' (title screen), 'pause' (career stats) or
+// 'play' (a live scene).
 // ---------------------------------------------------------------------------
+function stageCrowd(cx, cz, seed) {
+  // Fill the frame with the life the city already has: traffic cars on the
+  // roads near (cx, cz) and pedestrians on the sidewalks nearby. Deterministic
+  // per shot, so retakes look the same.
+  const rng = mulberry32(seed);
+  for (let i = 0; i < 5 && i < traffic.length; i += 1) {
+    const p = city.roadPointNear(cx, cz, 55);
+    const car = traffic[i].car;
+    car.pos.x = p.x;
+    car.pos.z = p.z;
+    car.heading = p.along === 'x' ? (rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2) : (rng() < 0.5 ? 0 : Math.PI);
+    car.speed = TRAFFIC.carSpeed;
+    car.update(0, 0, 0, city.colliders); // sync the mesh once
+  }
+  for (let i = 0; i < 7 && i < pedestrians.length; i += 1) {
+    const p = city.sidewalkPointNear(cx, cz, 34);
+    const ped = pedestrians[i];
+    ped.pos.x = p.x;
+    ped.pos.z = p.z;
+    ped.target = city.sidewalkPointNear(cx, cz, 34);
+  }
+}
+
 function stageShot(name) {
   resetWorld();
-  if (name === 'foot') {
-    // On foot on Coral Ave, 6 m west of the red convertible: the on-foot
-    // camera sits 10 m north of the walker looking south, so the car lands
-    // in frame ahead-left at a readable size instead of beside the camera.
-    walker.pos.x = 0;
-    walker.pos.z = -78;
-    return;
+  if (name === 'title') {
+    // Title screen: the menu overlay over a slow sunset panorama. The state
+    // stays 'menu' so the orbit camera runs; the HUD is hidden by CSS.
+    document.body.classList.add('shot-title');
+    // resetWorld() already showed the opening dialog (inline display beats
+    // the CSS hide), so hide it outright.
+    hud.hideDialog();
+    return 'menu';
   }
-  if (name === 'mission') {
-    // Driving toward the marina pickup, mission 2 staged.
+  if (name === 'stats') {
+    // Career stats over a high three-quarter view of the sunset city.
+    document.body.classList.add('shot-stats');
+    hud.hideDialog();
     missions.index = 1;
-    world.stolen = true;
-    world.escaped = true;
+    world.cash = 400;
+    world.bestCash = 400;
+    world.missionsDone = 1;
+    world.carsStolen = 1;
+    world.escapes = 1;
     world.driving = true;
     world.car = redConvertible;
-    redConvertible.pos.x = 26;
-    redConvertible.pos.z = 90;
+    redConvertible.pos.x = -26;
+    redConvertible.pos.z = -40;
     redConvertible.heading = 0;
-    redConvertible.speed = 12;
+    redConvertible.speed = 0;
+    stageCrowd(0, 0, 41);
+    camera.position.set(-60, 48, -120);
+    camera.lookAt(0, 0, 10);
+    return 'pause';
+  }
+  if (name === 'foot') {
+    // On foot on Coral Ave at sunset, beside the red convertible, with
+    // pedestrians on the sidewalk and traffic passing on the road. The
+    // walker stands 4 m from the car so the "Press E to steal" prompt is
+    // on screen, and the camera snaps straight behind him (no slow travel
+    // through the buildings while it gets there).
+    walker.pos.x = 2;
+    walker.pos.z = -77;
+    stageCrowd(0, -78, 17);
+    heli.placeNear(0, -78, 2.2);
+    chase.snapTo(walker.pos, 0, false, city.colliders);
     updateMissionText();
-    return;
+    return 'play';
   }
-  if (name === 'chase') {
-    // Mid-chase: driving fast, wanted 2, police car right behind.
-    world.driving = true;
-    world.car = redConvertible;
-    world.stolen = true;
-    redConvertible.pos.x = 26;
-    redConvertible.pos.z = 0;
-    redConvertible.heading = 0;
-    redConvertible.speed = 22;
-    police.raise(2, walker.pos, city.colliders);
-    police.car.pos.x = 26;
-    police.car.pos.z = 26;
-    police.car.heading = 0;
-    police.car.speed = 20;
-    return;
-  }
-  // Default: cover — driving down Coral Ave with the HUD on.
+  // Default: chase — mid-pursuit at sunset, wanted 2, the police car right
+  // behind, traffic ahead and pedestrians on the sidewalks.
   world.driving = true;
   world.car = redConvertible;
   world.stolen = true;
-  redConvertible.pos.x = -26;
-  redConvertible.pos.z = -40;
+  redConvertible.pos.x = 26;
+  redConvertible.pos.z = 0;
   redConvertible.heading = 0;
-  redConvertible.speed = 16;
+  redConvertible.speed = 22;
+  police.raise(2, walker.pos, city.colliders);
+  // Same direction as the player, a little faster, staying ahead in the
+  // frame: a cop behind the player would sit behind the chase camera and
+  // never be seen, and an oncoming cop closes too fast to frame reliably.
+  // (The dispatch panel still reports the real distance.)
+  police.car.pos.x = 26;
+  police.car.pos.z = 50;
+  police.car.heading = 0;
+  police.car.speed = 20;
+  stageCrowd(26, 0, 7);
+  // Cars ahead on the same road and one crossing the junction ahead, so
+  // the street reads as traffic instead of an empty runway. They are
+  // placed close (the shot is taken ~1 s after staging, before the scene
+  // has played far enough for anything to move much) and offset into the
+  // lanes, so they sit beside the district card instead of behind it:
+  // at 30–50 m a car on the centre line is only a speck behind the card.
+  placeTraffic(0, 30, 20, 0); // right lane
+  placeTraffic(1, 22, 34, 0); // left lane, clear of the police at z=45
+  placeTraffic(2, -26, 78, 0);
+  // Low and close over the road ahead, so the helicopter and its
+  // spotlight pool are actually in frame instead of above it.
+  heli.placeNear(26, 0, 1.35, 32, 30);
+  chase.snapTo(redConvertible.pos, 0, true, city.colliders);
+  updateMissionText();
+  return 'play';
+}
+
+/** Park a traffic car at an exact spot for a staged shot. */
+function placeTraffic(i, x, z, heading) {
+  if (i >= traffic.length) return;
+  const car = traffic[i].car;
+  car.pos.x = x;
+  car.pos.z = z;
+  car.heading = heading;
+  car.speed = TRAFFIC.carSpeed;
+  car.update(0, 0, 0, city.colliders); // sync the mesh once
+  // Straight run up and down this road line: without this, the car's own
+  // waypoint rectangle would steer it off the road and back past the
+  // camera before the shot is taken.
+  traffic[i].waypoints = [{ x, z: 130 }, { x, z: -130 }];
+  traffic[i].next = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +421,8 @@ window.addEventListener('keydown', (event) => {
   }
   if (event.code === 'KeyP' && (world.state === 'play' || world.state === 'pause')) {
     world.state = world.state === 'play' ? 'pause' : 'play';
-    hud.setPrompt(world.state === 'pause' ? 'PAUSED — press P to resume' : '');
+    hud.showStats(world.state === 'pause', collectStats());
+    hud.setPrompt(world.state === 'pause' ? '' : '');
   }
   if (event.code === 'KeyR' && world.state === 'busted') resetWorld();
 });
@@ -301,14 +446,23 @@ const shotName = params.get('shot');
 let lastNow = performance.now();
 
 if (shotName) {
-  // Screenshot mode: stage the scene and start playing at once.
-  stageShot(shotName);
-  world.state = 'play';
-  hud.showMenu(false);
-  updateMissionText();
+  // Screenshot mode: stage the scene; the shot decides its own state.
+  const shotState = stageShot(shotName);
+  world.state = shotState;
+  if (shotState === 'menu') {
+    hud.showMenu(true);
+  } else if (shotState === 'pause') {
+    hud.showMenu(false);
+    hud.showStats(true, collectStats());
+    updateMissionText();
+  } else {
+    hud.showMenu(false);
+    updateMissionText();
+  }
 } else {
   hud.setCash(0);
-  hud.setMission('Press START — three jobs, one sunset, $1,300 on the line.');
+  hud.setMissionText('Press START — three jobs, one sunset, $1,300 on the line.');
+  hud.setRadio(RADIO_TRACKS[0]);
 }
 
 function frame(now) {
@@ -321,6 +475,7 @@ function frame(now) {
     const angle = world.time * 0.08;
     camera.position.set(Math.sin(angle) * 90, 55, Math.cos(angle) * 90);
     camera.lookAt(0, 0, 0);
+    heli.update(dt, walker.pos);
   }
 
   if (world.state === 'play') {
@@ -348,7 +503,13 @@ function frame(now) {
       const throttle = input.down('KeyW', 'ArrowUp') ? 1 : input.down('KeyS', 'ArrowDown') ? -1 : 0;
       const steer = input.down('KeyA', 'ArrowLeft') ? -1 : input.down('KeyD', 'ArrowRight') ? 1 : 0;
       const handbrake = input.down('Space');
-      world.car.update(dt, throttle, steer, city.colliders);
+      const scraped = world.car.update(dt, throttle, steer, city.colliders);
+      // A scrape wears the car's condition down (shown in the HUD panel).
+      if (world.scrapeCooldown > 0) world.scrapeCooldown -= dt;
+      if (scraped && world.scrapeCooldown <= 0) {
+        world.scrapeCooldown = 0.5;
+        world.carCondition = Math.max(15, world.carCondition - 8);
+      }
       if (handbrake) world.car.speed *= Math.max(0, 1 - 3 * dt);
       // Ramming a pedestrian raises the wanted level.
       if (world.pedCooldown > 0) world.pedCooldown -= dt;
@@ -383,6 +544,8 @@ function frame(now) {
     } else if (policeResult === 'escaped') {
       world.escaped = true;
       world.wanted = 0;
+      world.escapes += 1;
+      if (missions.current && missions.current.id === 'steal') hud.showDialog(...DIALOG.escaped);
     }
     world.wanted = police.stars;
 
@@ -395,9 +558,11 @@ function frame(now) {
         if (!world.pickedUp && toMarina < 7) {
           world.pickedUp = true;
           audio.blip();
+          hud.showDialog(...DIALOG.pickedUp);
           updateMissionText();
-        } else if (world.pickedUp && toHotel < 7) {
+        } else if (world.pickedUp && !world.delivered && toHotel < 7) {
           world.delivered = true;
+          hud.showDialog(...DIALOG.delivered);
         }
       }
       if (mission.id === 'getaway') {
@@ -407,19 +572,35 @@ function frame(now) {
       completeMissionIfReady();
     }
 
-    // Camera follows the walker or the car.
+    // Camera follows the walker or the car; the helicopter circles above.
     chase.update(dt, playerPos, world.driving && world.car ? world.car.heading : 0, world.driving, city.colliders);
+    heli.update(dt, playerPos);
 
     // HUD.
     hud.setStars(world.wanted);
     hud.setSpeed(playerSpeed * 3.6);
     hud.setCash(world.cash);
+    hud.setDispatch(world.wanted > 0, {
+      unit: 'UNIT 7',
+      dist: police.dist,
+      tactic: police.tactic(),
+      stars: world.wanted,
+      heatFrac: police.heatFrac,
+    });
+    hud.setVehicle(
+      world.driving && world.car === redConvertible ? 'RED CONVERTIBLE'
+        : world.driving && world.car === blackSedan ? 'BLACK SEDAN' : 'ON FOOT — DARIO CRUZ',
+      world.driving ? world.carCondition : 100,
+    );
+    const district = city.districtAt(playerPos.x, playerPos.z);
+    hud.showDistrict(district.name, district.sub);
     const nearCar = nearestStealable();
     if (nearCar) hud.setPrompt('Press E to steal the car');
     else if (world.state === 'play' && !hud.promptEl.textContent.startsWith('PAUSED')) hud.setPrompt('');
     hud.drawMinimap({
       time: world.time,
       roadLines: city.roadLines,
+      colliders: city.colliders,
       missionMarker: mission ? (mission.id === 'delivery' && world.pickedUp ? missions.spots.hotel : mission.marker) : null,
       trafficDots: traffic.map((t) => t.car.pos),
       policeDots: police.active && police.car ? [police.car.pos] : [],
@@ -435,6 +616,6 @@ function frame(now) {
 }
 
 // Test hook: the probe scripts read the live state from here.
-window.__game = { world, missions, police, walker, redConvertible, blackSedan };
+window.__game = { world, missions, police, walker, redConvertible, blackSedan, traffic, pedestrians, heli, camera: chase.camera };
 
 renderer.setAnimationLoop(frame);

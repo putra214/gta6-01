@@ -14,7 +14,7 @@ Dario Cruz is a wheelman with a debt to pay. Three jobs, one sunset:
 2. **Pier Run** — pick up a package at the marina and deliver it to the Hotel Solmar.
 3. **The Getaway** — take the black sedan and reach the hideout with the cops on your tail.
 
-Stealing a car or ramming a pedestrian raises your wanted level; stay out of the police's sight for 20 seconds and the heat dies down. Get caught slow by a cop and you are busted. Finish all three jobs to win the story — cash is saved between sessions.
+Stealing a car or ramming a pedestrian raises your wanted level; stay out of the police's sight for 7 seconds and the heat dies down. Get caught slow by a cop and you are busted. Finish all three jobs to win the story — your best cash and completed jobs are saved between sessions.
 
 ## Run it
 
@@ -29,10 +29,11 @@ No build step, no network: the game is static files under `game/` (three.js r187
 
 ## How it is built
 
-- `game/src/city.js` builds the procedural city (5×5 blocks, roads, palms, beach and sea) from one seed.
-- `game/src/car.js` is the arcade car physics shared by the player, traffic and police.
-- `game/src/player.js`, `game/src/traffic.js`, `game/src/police.js` are the walker, ambient life and the wanted system.
-- `game/src/missions.js` is the three-job chain; `game/src/hud.js` draws the minimap and HUD; `game/src/audio.js` synthesizes engine and siren sounds.
+- `game/src/city.js` builds the procedural city (5×5 blocks, roads, palms, beach and sea) from one seed, with glowing dusk windows and district names.
+- `game/src/sky.js` is the sunset: a violet-to-gold gradient sky, a low sun, clouds and glowing street lamps. `game/src/helicopter.js` is the ambient helicopter circling above the city with a spotlight.
+- `game/src/car.js` is the arcade car physics shared by the player, traffic and police; scraping a building wears the car's condition down.
+- `game/src/player.js`, `game/src/traffic.js`, `game/src/police.js` are the walker, ambient life and the wanted system (the police dispatch panel shows the real pursuing unit, its distance and its tactic).
+- `game/src/missions.js` is the three-job chain; `game/src/hud.js` draws the mission checklist, dispatch panel, vehicle condition, radio, dialog, district cards and the minimap (with building blocks); `game/src/audio.js` synthesizes engine and siren sounds.
 - `main.ts` (Node 22, standard library only) copies `game/` and `screenshots/` to `/output` and writes `/output/dossier.json` with the kit's `vendor/makefun-game.ts`.
 
 ---

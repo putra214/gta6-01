@@ -92,7 +92,8 @@ export class ArcadeCar {
 
     const before = { x: nx, z: nz };
     const fixed = resolveCircleVsBuildings(nx, nz, CAR.radius, colliders);
-    if (fixed.x !== before.x || fixed.z !== before.z) {
+    const scraped = fixed.x !== before.x || fixed.z !== before.z;
+    if (scraped) {
       this.speed *= 0.5; // scrape: lose half the speed, keep going
     }
     this.pos.x = fixed.x;
@@ -111,6 +112,8 @@ export class ArcadeCar {
       wheels[0].rotation.y = this.steer;
       wheels[1].rotation.y = this.steer;
     }
+    // True when this frame scraped a building: the HUD reads it as damage.
+    return scraped;
   }
 
   /** A random body colour for traffic cars. */

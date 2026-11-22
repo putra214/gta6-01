@@ -17,6 +17,20 @@ export class Police {
     this.bustTimer = 0;
     this.flashTimer = 0;
     this.stars = 0;
+    this.dist = Infinity; // metres from the pursuit car to the player
+  }
+
+  /** What the pursuit car is doing, for the dispatch panel. */
+  tactic() {
+    if (!this.active || !this.car) return '';
+    if (this.bustTimer > 0) return 'CLOSING IN';
+    if (this.dist > WANTED.policeSight) return 'SEARCHING';
+    return 'IN PURSUIT';
+  }
+
+  /** Heat built so far, as a 0..1 fraction of the escape time. */
+  get heatFrac() {
+    return Math.max(0, Math.min(1, this.heatTimer / WANTED.heatDecaySeconds));
   }
 
   /** Raise the wanted level and spawn a pursuit car if none is active. */
@@ -44,6 +58,7 @@ export class Police {
     this.stars = 0;
     this.heatTimer = 0;
     this.bustTimer = 0;
+    this.dist = Infinity;
     if (this.car) {
       this.scene.remove(this.car.mesh);
       this.car = null;
@@ -60,6 +75,7 @@ export class Police {
     const dx = playerPos.x - this.car.pos.x;
     const dz = playerPos.z - this.car.pos.z;
     const dist = Math.hypot(dx, dz);
+    this.dist = dist;
 
     // Chase: steer toward the player, full throttle, capped below top speed.
     const wantHeading = Math.atan2(dx, dz);

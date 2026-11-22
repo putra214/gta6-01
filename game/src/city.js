@@ -51,7 +51,31 @@ function makeFacadeTexture() {
   for (let row = 0; row < 8; row += 1) {
     for (let col = 0; col < 4; col += 1) {
       const lit = ((row * 4 + col) % 5) !== 0;
-      ctx.fillStyle = lit ? '#ffe9a8' : '#5a6a7a';
+      ctx.fillStyle = lit ? '#ffb347' : '#3a4a5a';
+      ctx.fillRect(12 + col * 28, 14 + row * 30, 18, 20);
+    }
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * The emissive partner of the facade: black everywhere except the lit
+ * windows, so only the windows glow warm at dusk (never the whole wall).
+ */
+function makeFacadeGlowTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, 128, 256);
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 4; col += 1) {
+      const lit = ((row * 4 + col) % 5) !== 0;
+      if (!lit) continue;
+      ctx.fillStyle = '#ffb347';
       ctx.fillRect(12 + col * 28, 14 + row * 30, 18, 20);
     }
   }
@@ -102,10 +126,13 @@ export function buildCity(scene, seed) {
   group.add(sea);
 
   const facade = makeFacadeTexture();
+  const facadeGlow = makeFacadeGlowTexture();
   const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
   boxGeometry.translate(0, 0.5, 0); // origin at the base
   const materials = PALETTE.map(
-    (color) => new THREE.MeshLambertMaterial({ color, map: facade }),
+    (color) => new THREE.MeshLambertMaterial({
+      color, map: facade, emissive: 0xff8c2e, emissiveMap: facadeGlow, emissiveIntensity: 0.55,
+    }),
   );
   const slabMaterial = new THREE.MeshLambertMaterial({ color: COLORS.sidewalk });
   const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8a6b4a });
@@ -203,6 +230,18 @@ export function buildCity(scene, seed) {
       const along = range(rng, -half + 8, half - 8);
       return rng() < 0.5 ? { x: line, z: along } : { x: along, z: line };
     },
+    /** A road point within `r` metres of (x, z), with its road direction. */
+    roadPointNear(x, z, r) {
+      for (let tries = 0; tries < 24; tries += 1) {
+        const p = this.roadPoint();
+        if (Math.hypot(p.x - x, p.z - z) > r) continue;
+        const onXLine = roadLines.includes(p.x);
+        return { x: p.x, z: p.z, along: onXLine ? 'x' : 'z' };
+      }
+      const p = this.roadPoint();
+      const onXLine = roadLines.includes(p.x);
+      return { x: p.x, z: p.z, along: onXLine ? 'x' : 'z' };
+    },
     /** A random point on a block's sidewalk, clear of the road. */
     sidewalkPoint() {
       const bx = Math.floor(rng() * CITY.blocks);
@@ -214,9 +253,46 @@ export function buildCity(scene, seed) {
         z: blockZ + range(rng, 3, CITY.blockSize - 3),
       };
     },
+    /** A sidewalk point within `r` metres of (x, z). */
+    sidewalkPointNear(x, z, r) {
+      for (let tries = 0; tries < 24; tries += 1) {
+        const p = this.sidewalkPoint();
+        if (Math.hypot(p.x - x, p.z - z) <= r) return p;
+      }
+      return this.sidewalkPoint();
+    },
     /** The centre of a road line, used for traffic waypoints. */
     roadLineAt(index) {
       return roadLines[index % roadLines.length];
+    },
+    /**
+     * The district at (x, z): the nearest named place, else the quadrant.
+     * The names are the ones on the mission beacons and the district cards.
+     */
+    districtAt(x, z) {
+      const places = [
+        { name: 'CORAL AVE', sub: 'SOLMAR BAY', x: 6, z: -78 },
+        { name: 'MARINA ROW', sub: 'THE PIER · SOLMAR BAY', x: 58, z: 148 },
+        { name: 'HOTEL ROW', sub: 'NORTHSIDE · SOLMAR BAY', x: -26, z: -110 },
+        { name: 'THE HIDEOUT', sub: 'WEST END · SOLMAR BAY', x: -78, z: 58 },
+      ];
+      let best = null;
+      let bestDist = Infinity;
+      for (const p of places) {
+        const d = Math.hypot(p.x - x, p.z - z);
+        if (d < bestDist) {
+          bestDist = d;
+          best = p;
+        }
+      }
+      if (bestDist < 55) return { name: best.name, sub: best.sub };
+      if (z > 128) return { name: 'THE STRAND', sub: 'THE BEACH · SOLMAR BAY' };
+      if (x < -80 && z < -80) return { name: 'OLD TOWN', sub: 'NORTHWEST · SOLMAR BAY' };
+      if (x > 80 && z < -80) return { name: 'EASTSIDE', sub: 'NORTHEAST · SOLMAR BAY' };
+      if (x < -80) return { name: 'WEST END', sub: 'SOLMAR BAY' };
+      if (x > 80) return { name: 'EASTSIDE', sub: 'SOLMAR BAY' };
+      if (z < -80) return { name: 'NORTHSIDE', sub: 'SOLMAR BAY' };
+      return { name: 'DOWNTOWN', sub: 'SOLMAR BAY' };
     },
   };
 }

@@ -1,10 +1,15 @@
 // Sunset Keys — a working gta6-01 entry (Node 22, standard library only).
 // The game is this directory's game/ folder: a three.js open-world crime
-// game set in Solmar Bay, plain static files a desktop browser loads offline
-// (game/index.html and its ES modules, three.js vendored under game/vendor/,
-// no network request). The program hands it in: it copies game/ and
-// screenshots/ from beside this file to /output and writes /output/dossier.json,
-// the summary the judge reads, with the vendored make.fun library.
+// game set in Solmar Bay at sunset, plain static files a desktop browser
+// loads offline (game/index.html and its ES modules, three.js vendored under
+// game/vendor/, no network request). The program hands it in: it copies
+// game/ and screenshots/ from beside this file to /output and writes
+// /output/dossier.json, the summary the judge reads, with the vendored
+// make.fun library. The sunset polish (2026-11-23) reworked the sky, the
+// lighting, the HUD and the cameras in-session; the screenshots below were
+// retaken from the polished game, all four of them staged live in ?shot=
+// scenes: the title screen, a police chase, Dario on foot, and the career
+// stats screen.
 // Play it: walk Coral Ave as Dario Cruz, steal the red convertible (E),
 // lose the cops, run the pier delivery, take the black sedan to the hideout.
 // Screenshots are real frames of the game (see shots.json for the scenes).

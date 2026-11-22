@@ -20,6 +20,14 @@ export function makeWalkerMesh() {
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), skin);
   head.position.y = 1.85;
   group.add(head);
+  // Dario's flat cap: a dark disc on the head plus a short brim.
+  const capMaterial = new THREE.MeshLambertMaterial({ color: 0x2e4a6b });
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.29, 0.12, 10), capMaterial);
+  cap.position.y = 2.02;
+  group.add(cap);
+  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, 0.22), capMaterial);
+  brim.position.set(0, 1.98, 0.28);
+  group.add(brim);
   const legGeometry = new THREE.BoxGeometry(0.22, 0.7, 0.22);
   const legL = new THREE.Mesh(legGeometry, pants);
   legL.position.set(-0.16, 0.35, 0);
