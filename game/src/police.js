@@ -85,7 +85,9 @@ export class Police {
       this.bustTimer = 0;
     }
 
-    // Heat: decays only while the player is out of the police's sight.
+    // Heat: builds while the player is out of the police's sight, and
+    // drains (never instantly resets) when the police sees them again, so
+    // a chase that keeps breaking line of sight still ends in an escape.
     if (dist > WANTED.policeSight) {
       this.heatTimer += dt;
       if (this.heatTimer >= WANTED.heatDecaySeconds) {
@@ -93,7 +95,7 @@ export class Police {
         return 'escaped';
       }
     } else {
-      this.heatTimer = 0;
+      this.heatTimer = Math.max(0, this.heatTimer - dt * 2);
     }
     return null;
   }
