@@ -214,9 +214,11 @@ function completeMissionIfReady() {
 function stageShot(name) {
   resetWorld();
   if (name === 'foot') {
-    // On foot beside the red convertible, steal prompt showing.
-    walker.pos.x = 2;
-    walker.pos.z = -54;
+    // On foot on Coral Ave, 6 m west of the red convertible: the on-foot
+    // camera sits 10 m north of the walker looking south, so the car lands
+    // in frame ahead-left at a readable size instead of beside the camera.
+    walker.pos.x = 0;
+    walker.pos.z = -78;
     return;
   }
   if (name === 'mission') {
