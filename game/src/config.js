@@ -29,9 +29,10 @@ export const CAR = {
 
 export const WANTED = {
   maxStars: 5,
-  heatDecaySeconds: 12, // seconds out of police sight before heat falls
+  heatDecaySeconds: 10, // seconds out of police sight before heat falls
   policeSight: 40, // m — closer than this, the police see you
-  policeSpeed: 17, // m/s — clearly below the player's top speed, so a clean getaway works
+  policeSpeed: 13, // m/s — well below the player's top speed; the police cut
+  // corners across blocks, so a bigger gap is needed for a clean getaway
   bustSeconds: 2, // seconds a cop must touch a slow player to bust them
 };
 
